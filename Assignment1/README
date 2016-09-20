@@ -1,0 +1,105 @@
+# (1) Replace "ckoch" by your gastpar username throughout these instructions.
+
+
+# (2) In your web browser, open
+# --  iccluster051.iccluster.epfl.ch:50070 (hdfs status)
+# --  iccluster057.iccluster.epfl.ch:8088/cluster
+# This is an optional step that can provide monitoring information.
+
+
+# (3) Connect to the server.
+#
+ssh ckoch@iccluster051.iccluster.epfl.ch
+#
+# All the instructions listed below are to be executed while logged in on
+# this server.
+
+
+# (4) Put your files into hdfs:/user/<your username>/
+# we are creating a directory input and a file myfile inside it for the examples
+# that follow, all inside your home directory.
+#
+hadoop fs -mkdir -p /user/ckoch/input
+echo "ab cd ab" > myfile; hadoop fs -put myfile /user/ckoch/input/
+
+
+# (5) The command "hadoop fs" lets you execute UNIX-style file manipulation
+# commands on HDFS. Look up the docs on the Web at
+# http://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/FileSystemShell.html
+#
+hadoop fs -ls /user/ckoch
+#
+# Result:
+# Found 1 items
+# drwxr-xr-x   - ckoch supergroup          0 2014-07-31 00:42 /user/ckoch/input
+
+
+# (6) You can browse the world-readable part of the HDFS file system using the
+# web browser. Go to
+# icdataportal1.epfl.ch:50070 -> "Utilities" menu -> "Browse the file system".
+
+
+
+# (7) In the examples jar you can find some precompiled standard examples.
+# See the Hadoop 2.7.1 mapreduce tutorial.
+#
+hadoop jar /usr/hdp/2.4.0.0-169/hadoop-mapreduce/hadoop-mapreduce-examples.jar wordcount -D mapred.map.tasks=4 -D mapred.reduce.tasks=2 /user/ckoch/input /user/ckoch/output
+hadoop fs -cat "/user/ckoch/output/*"
+#
+# Result:
+# ab    2
+# cd    1
+# Also inspect the directory /user/ckoch/output/
+# using "hadoop fs -ls". Mapreduce has a
+# particular way of storing results.
+
+
+# (8) We run Spark on Hadoop/YARN...
+# This is one of the standard precompiled Spark examples. Look at it's source
+# code on the Web.
+#
+spark-submit --class org.apache.spark.examples.SparkPi --master yarn-cluster --executor-memory 2g --num-executors 3 --executor-cores 1 /usr/hdp/current/spark-client/lib/spark-examples-1.6.0.2.4.0.0-169-hadoop2.7.1.2.4.0.0-169.jar 10
+
+
+# (9) A Scala Spark example. We compile using sbt.
+# Have a look at the source code at
+# ~hadoop/examples/spark/SparkScalaWordCount/src/main/scala/WordCount.scala
+#
+cp -R /cs422/SparkScalaWordCount ~
+cd SparkScalaWordCount/
+sbt package
+cd ..
+#
+# --master can be yarn-client or yarn-cluster
+#
+hadoop fs -rm -r /user/ckoch/output
+spark-submit --class WordCount --master yarn-client SparkScalaWordCount/target/scala-2.10/sparkscalawordcount_2.10-1.0.jar hdfs:///user/ckoch/input hdfs:///user/ckoch/output
+hadoop fs -cat "/user/ckoch/output/part-*"
+#
+# Result:
+# (ab,2)
+# (cd,1)
+
+
+# (10) Look at at the notes of the data parallel programming lecture
+# for examples of the use of the
+# scala interactive shell (Scala REPL). The spark-shell is just the Scala REPL
+# with Spark pre-loaded into it.
+# run with
+spark-shell
+# for local mode. Nice for testing, but this does not run in the cluster and
+# does not really parallelize. But its a nice step inbetween the pure Scala REPL
+# and working in the cluster. You can use RDDs in local mode too, they are just
+$ not parallelized.
+
+
+# (11) Run the spark-shell in the cluster with option --master yarn-client.
+# Note that "--master yarn-cluster" does not work!
+spark-shell --master yarn-client --num-executors 25
+
+
+# Spark can be very slow if you use it naively! Don't eat up all the resources,
+# the other students want to use the cluster too!
+
+#Note: there cannot be more than 16 concurrent spark-client jobs!
+#Use spark-cluster instead whenever you can!
